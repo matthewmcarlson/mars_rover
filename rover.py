@@ -18,7 +18,7 @@ class Rover_Download_Timer(object):
         the compute function will be triggered and set the answer attribute.
         (See __setattr__ for details)."""
         self.DEBUG=debug
-        self.pr('#'*80)
+        self.print_debug('#'*80)
         self.N_BYTES = N
         self.LATENCY = L
         self.BANDWIDTH = B
@@ -36,34 +36,38 @@ class Rover_Download_Timer(object):
         (start byte, stop byte, total time)."""
         solutions = []
         new_solutions = []
-        ### negative startings points don't really make sense, but why not 
-        ### handle them anyways?
         for index in xrange(len(chunks)):
             start, stop = chunks[index]
+            ### If the chunk starts after the end of the file, we're done
             if start > n_bytes:
                 break
+            ### Negative startings points don't really make sense, but why not 
+            ### handle them anyways?
             if start <= 0:
                 solutions.append((stop, self.download_chunk_time(start, stop)))
             else:
-                start, stop = chunks[index]
                 for sol_stop, sol_time in solutions:
+                    ### this chunk gets us any further, create a new candidate
+                    ### sollution that includes it.
                     if start <= sol_stop and stop > sol_stop:
                         time = sol_time + self.download_chunk_time(start, stop)
                         new_solutions.append((stop, time))
-                self.pr(new_solutions)
+                self.print_debug(new_solutions)
+                ### empty new_solutions so we can reuse it without reallocating
                 while new_solutions:
                     solutions.append(new_solutions.pop())
                 # solutions.extend(new_solutions)
-                self.pr(solutions)
+                self.print_debug(solutions)
                 self.prune_solutions(solutions, start)
                 ### If we've ran out of candiates, there can't be a sollution
                 if not solutions:
                     return []
+        ### Iterate backwards, otherwise when we pop we'll be off by 1.
         for i in xrange(len(solutions)-1, -1, -1):
             stop, time = solutions[i]
             if stop < n_bytes:
                 solutions.pop(i)
-        self.pr(solutions)
+        self.print_debug(solutions)
         return solutions
 
     def download_chunk_time(self, start, stop, latency=None, bandwidth=None):
@@ -83,12 +87,14 @@ class Rover_Download_Timer(object):
         ### bad solutions off.
         for i in xrange(len(solutions)-1, -1, -1):
             stop, time = solutions[i]
+            ### If the chunks are all starting in a larger range than this 
+            ### sollution, chuck it because it's not going anywhere.
             if chunk_start > stop:
                 solutions.pop(i)
             else:
                 for j in xrange(i):
                     ### If there's another solution that's faster and further
-                    ### (or equal), chuck this one.
+                    ### (or equal), chuck this one. 
                     if solutions[j][1]<=time and solutions[j][0]>=stop:
                         solutions.pop(i)
                         break
@@ -134,7 +140,7 @@ class Rover_Download_Timer(object):
                 ret+='.000'
         return ret
 
-    def pr(self, s):
+    def print_debug(self, s):
         if self.DEBUG: print s
 
 if __name__ == '__main__':
@@ -148,11 +154,14 @@ if __name__ == '__main__':
     ### Number of chunks. 1 <= C <= 100000
     C = int(raw_input())
     chunks = []
+    ### Read in all of the chunks
     for i in xrange(C):
         input_ = raw_input().split(',')
         chunk = tuple(map(int, input_))
         chunks.append(chunk)
+    ### call the timer, 
     rover = Rover_Download_Timer(N, L, B, chunks)
+    ### and get the answer
     if rover.answer_str:
         print rover.answer_str
     

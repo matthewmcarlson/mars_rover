@@ -54,6 +54,7 @@ class Rover_Download_Timer(object):
                 self.pr(solutions)
                 self.prune_solutions(solutions)
         ret = filter(lambda x:x[1]>=n_bytes, solutions)
+        self.pr(solutions)
         return ret
 
     def download_chunk_time(self, start, stop, latency=None, bandwidth=None):

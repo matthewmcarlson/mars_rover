@@ -29,7 +29,7 @@ tests = [
 
 for input_, expected_result in tests:
     N, L, B, C, chunks = input_
-    rover = Rover_Download_Timer(N, L, B, chunks)    
+    rover = Rover_Download_Timer(N, L, B, chunks, debug=2)
     res = rover.answer_str
     if res == expected_result:
         print 'Pass!'

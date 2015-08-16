@@ -49,6 +49,9 @@ class Rover_Download_Timer(object):
                     if start <= sol_stop and stop > sol_stop:
                         time = sol_time + self.download_chunk_time(start, stop)
                         new_solutions.append((sol_start, stop, time))
+                    elif sol_stop < start:
+                        ### TODO this solution should be chucked
+                        pass
                 solutions.extend(new_solutions)
                 self.pr(new_solutions)
                 self.pr(solutions)

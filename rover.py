@@ -29,36 +29,46 @@ class Rover_Download_Timer(object):
         (or None if it's not possible)."""
         solutions = self.compute_solutions(n_bytes, latency, bandwidth, chunks)
         if solutions:
-            return min(map(lambda x:x[2], solutions))
+            return min(map(lambda x:x[1], solutions))
 
     def compute_solutions(self, n_bytes, latency, bandwidth, chunks):
         """Get a list of all possible solutions where a solution looks like:
         (start byte, stop byte, total time)."""
         solutions = []
+        new_solutions = []
         ### negative startings points don't really make sense, but why not 
         ### handle them anyways?
         for index in xrange(len(chunks)):
             start, stop = chunks[index]
+            if start > n_bytes:
+                break
             if start <= 0:
-                solutions.append((start, stop, 
-                                  self.download_chunk_time(start, stop)))
+                solutions.append((stop, self.download_chunk_time(start, stop)))
             else:
-                new_solutions = []
                 start, stop = chunks[index]
-                for sol_start, sol_stop, sol_time in solutions:
+                for sol_stop, sol_time in solutions:
                     if start <= sol_stop and stop > sol_stop:
                         time = sol_time + self.download_chunk_time(start, stop)
-                        new_solutions.append((sol_start, stop, time))
+                        new_solutions.append((stop, time))
                     elif sol_stop < start:
                         ### TODO this solution should be chucked
                         pass
-                solutions.extend(new_solutions)
+
+                while new_solutions:
+                    solutions.append(new_solutions.pop())
+                # solutions.extend(new_solutions)
                 self.pr(new_solutions)
                 self.pr(solutions)
-                self.prune_solutions(solutions)
-        ret = filter(lambda x:x[1]>=n_bytes, solutions)
+                self.prune_solutions(solutions, start)
+                ### If we've ran out of candiates, there can't be a sollution
+                if not solutions:
+                    return []
+        for i in xrange(len(solutions)-1, -1, -1):
+            stop, time = solutions[i]
+            if stop < n_bytes:
+                solutions.pop(i)
         self.pr(solutions)
-        return ret
+        return solutions
 
     def download_chunk_time(self, start, stop, latency=None, bandwidth=None):
         """Returns how long it takes to download a given chunk"""
@@ -71,18 +81,21 @@ class Rover_Download_Timer(object):
         # else:
         return 2*latency + (stop - start)/bandwidth
 
-    def prune_solutions(self, solutions):
+    def prune_solutions(self, solutions, chunk_start):
         """Stop wasting cycles trying obviously bad solutions."""
         ### Iterate backwards through the list, since we might be popping 
         ### bad solutions off.
         for i in xrange(len(solutions)-1, -1, -1):
-            start, stop, time = solutions[i]
-            for j in xrange(i):
-                ### If there's another solution that's faster and further
-                ### (or equal), chuck this one.
-                if solutions[j][2]<=time and solutions[j][1]>=stop:
-                    solutions.pop(i)
-                    break
+            stop, time = solutions[i]
+            if chunk_start > stop:
+                solutions.pop(i)
+            else:
+                for j in xrange(i):
+                    ### If there's another solution that's faster and further
+                    ### (or equal), chuck this one.
+                    if solutions[j][1]<=time and solutions[j][0]>=stop:
+                        solutions.pop(i)
+                        break
 
     def __setattr__(self, attr, val):
         """If the user tweaks one of the input values, recompute the answer."""
@@ -112,12 +125,17 @@ class Rover_Download_Timer(object):
         if answer is None:
             ret = ''
         else:
-            ret = '{:.4}'.format(answer)
+            ret = '{}'.format(answer)
             ### This is a bit of a hack, but from reading the str.format docs
             ### I can't find a way to make it fill with zeros. Normally I would
             ### search the internet and see if there's a solution, but that's
             ### not allowed here. Hence the hack.
-            ret = ret+'0'*(len(ret)-ret.find('.'))
+            try:
+                ret +='0'*(len(ret)-ret.index('.'))
+            ### answers should always be floats because we took care that 
+            ### latencies and bandwidth should always be floats
+            except ValueError:
+                ret+='.000'
         return ret
 
     def pr(self, s):

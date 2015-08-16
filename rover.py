@@ -17,6 +17,8 @@ class Rover_Download_Timer(object):
         """Sets all the global attributes. Note that once they're all defined,
         the compute function will be triggered and set the answer attribute.
         (See __setattr__ for details)."""
+        self.DEBUG=2
+        self.pr('#'*80)
         self.N_BYTES = N
         self.LATENCY = L
         self.BANDWIDTH = B
@@ -25,14 +27,15 @@ class Rover_Download_Timer(object):
     def compute(self, n_bytes, latency, bandwidth, chunks):
         """The meat and potatoes."""
         solutions = self.compute_solutions(n_bytes, latency, bandwidth, chunks)
-        return min(map(lambda x:x[2], solutions))
+        if solutions:
+            return min(map(lambda x:x[2], solutions))
+
 
     def compute_solutions(self, n_bytes, latency, bandwidth, chunks):
         """"""
         solutions = []
         ### negative startings points don't really make sense, but why not 
         ### handle them anyways?
-        print chunks
         for index in xrange(len(chunks)):
             start, stop = chunks[index]
             if start <= 0:
@@ -40,18 +43,41 @@ class Rover_Download_Timer(object):
                                   self.download_chunk_time(start, stop)))
             else:
                 break
-        print solutions
-        while index < len(chunks):
-            pass
-            index+=1
-        return solutions
+        for index in xrange(index, len(chunks)):
+            new_solutions = []
+            start, stop = chunks[index]
+            for sol_start, sol_stop, sol_time in solutions:
+                if start <= sol_stop and stop > sol_stop:
+                    time = sol_time + self.download_chunk_time(start, stop)
+                    new_solutions.append((sol_start, stop, time))
+            solutions.extend(new_solutions)
+            self.pr(new_solutions)
+            self.pr(solutions)
+            self.prune_solutions(solutions)
+        ret = filter(lambda x:x[1]>=n_bytes, solutions)
+        return ret
 
+    def prune_solutions(self, solutions):
+        ### iterate backwards through the list
+        for i in xrange(len(solutions)-1, -1, -1):
+            start, stop, time = solutions[i]
+            for j in xrange(i):
+                ### if there's another solution that's faster and further
+                ### (or equal), chuck this one.
+                if solutions[j][2]<=time and solutions[j][1]>=stop:
+                    solutions.pop(i)
+                    break
 
     def __setattr__(self, attr, val):
         """If the user tweaks one of the input values, recompute the answer."""
         ### Attrs that trigger a recompute
         essential_attrs = ('CHUNKS', 'N_BYTES', 'LATENCY', 'BANDWIDTH')
-        object.__setattr__(self, attr, val)
+        ### Latency and Bandwidth should always be floats so that the answer 
+        ### will always be a float
+        if attr in ('LATENCY', 'BANDWIDTH'):
+            object.__setattr__(self, attr, float(val))
+        else:
+            object.__setattr__(self, attr, val)
         ### Only recompute if all of the neccesary attributes are defined and
         ### the attributes that was changed is one that effects the answer.
         if (all(map(lambda x:hasattr(self, x), essential_attrs)) and
@@ -72,6 +98,9 @@ class Rover_Download_Timer(object):
         # else:
         return 2*latency + (stop - start)/bandwidth
 
+    def pr(self, s):
+        if self.DEBUG: print s
+
 if __name__ == '__main__':
     #1 <= N, L, B < 2**32
     #the number of bytes in the original file.
@@ -88,5 +117,6 @@ if __name__ == '__main__':
         chunk = tuple(map(int, input_))
         chunks.append(chunk)
     rover = Rover_Download_Timer(N, L, B, chunks)
-    print rover.answer
+    pprint = '{:.4}'.rover.answer
+    print pprint
     
